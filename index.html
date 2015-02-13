@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Canyon Crest photos</title>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<meta property="og:image" content="route.png" />
+	<link rel="stylesheet" href="lib/leaflet/leaflet.css" />
+	<link rel="stylesheet" href="lib/cluster/MarkerCluster.css" />	
+	<link rel="stylesheet" href="Leaflet.Photo.css" />	
+	<link rel="stylesheet" href="css/map.css" />
+</head>
+<body>
+
+
+
+	<div id="map"></div>
+	<script src="lib/reqwest.min.js"></script>
+	<script src="lib/leaflet/leaflet.js"></script>
+	<script src="lib/cluster/leaflet.markercluster.js"></script>	
+	<script src="Leaflet.Photo.js"></script>
+	<script src="//code.jquery.com/jquery-1.11.2.min.js"></script>
+	<script>
+
+	var outdoors = L.tileLayer('http://api.tiles.mapbox.com/v4/slugis.25db57b7/{z}/{x}/{y}.png?access_token=pk.eyJ1Ijoic2x1Z2lzIiwiYSI6IlB5TlZENVUifQ.Z597Ia0qffZlYcGpbJtzTA'),
+		afternoon = L.tileLayer('http://api.tiles.mapbox.com/v4/slugis.da0a550c/{z}/{x}/{y}.png?access_token=pk.eyJ1Ijoic2x1Z2lzIiwiYSI6IlB5TlZENVUifQ.Z597Ia0qffZlYcGpbJtzTA'),
+		contrast = L.tileLayer('http://api.tiles.mapbox.com/v4/slugis.6a32585c/{z}/{x}/{y}.png?access_token=pk.eyJ1Ijoic2x1Z2lzIiwiYSI6IlB5TlZENVUifQ.Z597Ia0qffZlYcGpbJtzTA');
+
+	var map = L.map('map', {
+		zoomControl: false,
+		maxZoom: 18,
+		attributionControl: false,
+		layers: [outdoors]
+	});
+
+	
+	var baseMaps = {
+		"Outdoors": outdoors,
+		"Satellite": afternoon,
+		"High Contrast" : contrast
+	};
+
+	L.control.layers(baseMaps, null).addTo(map);
+
+	var album = L.control.attribution().addTo(map);
+	album.addAttribution('<a href="https://plus.google.com/photos/111793559548187434722/albums/6115126548076831793">Original photo album</a>');
+	album.setPrefix("");
+	album.setPosition('bottomleft');
+
+	L.control.zoom({
+    	position:'bottomright'
+	}).addTo(map);
+
+	var photoLayer = L.photo.cluster().on('click', function (evt) {
+		var photo = evt.layer.photo,
+			template = '<img src="{url}"/></a><p>{caption}</p>';
+
+		if (photo.video && (!!document.createElement('video').canPlayType('video/mp4; codecs=avc1.42E01E,mp4a.40.2'))) {
+			template = '<video autoplay controls poster="{url}"><source src="{video}" type="video/mp4"/></video>';
+		}; 
+
+		evt.layer.bindPopup(L.Util.template(template, photo), {
+			className: 'leaflet-popup-photo',
+			minWidth: 400
+		}).openPopup();
+	});
+
+	reqwest({
+		url: 'https://picasaweb.google.com/data/feed/api/user/111793559548187434722/albumid/6115126548076831793?alt=json-in-script',
+		type: 'jsonp',
+		success: function (data) {
+			var photos = [];
+			data = data.feed.entry;
+
+			for (var i = 0; i < data.length; i++) {
+				var photo = data[i];
+				if (photo['georss$where']) {
+					var pos = photo['georss$where']['gml$Point']['gml$pos']['$t'].split(' ');
+					photos.push({
+						lat: pos[0],
+						lng: pos[1],
+						url: photo['media$group']['media$content'][0].url,
+						caption: photo['media$group']['media$description']['$t'],
+						thumbnail: photo['media$group']['media$thumbnail'][0].url,
+						video: (photo['media$group']['media$content'][1] ? photo['media$group']['media$content'][1].url : null) 
+					});
+				};
+			}
+			
+			photoLayer.add(photos).addTo(map);
+			map.fitBounds(photoLayer.getBounds());
+		}
+	});
+	</script>
+</body>
+</html>
